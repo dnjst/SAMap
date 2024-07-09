@@ -795,8 +795,8 @@ class GenePairFinder(object):
 
         pairs = np.unique(np.vstack((np.vstack((a, b)).T, np.vstack((d, c)).T)), axis=0)
 
-        av1 = X1[np.unique(pairs[:, 0]), :].mean(0).A.flatten()
-        av2 = X2[np.unique(pairs[:, 1]), :].mean(0).A.flatten()
+        av1 = X1[np.unique(pairs[:, 0]), :].mean(0).toarray().flatten()
+        av2 = X2[np.unique(pairs[:, 1]), :].mean(0).toarray().flatten()
         sav1 = (av1 - av1.mean()) / av1.std()
         sav2 = (av2 - av2.mean()) / av2.std()
         sav1[sav1 < 0] = 0
@@ -804,8 +804,8 @@ class GenePairFinder(object):
         val = sav1 * sav2 / sav1.size
         X1.data[:] = 1
         X2.data[:] = 1
-        min_expr = (X1.mean(0).A.flatten() > expr_thr) * (
-            X2.mean(0).A.flatten() > expr_thr
+        min_expr = (X1.mean(0).toarray().flatten() > expr_thr) * (
+            X2.mean(0).toarray().flatten() > expr_thr
         )
 
         w1 = sam1.adata.var["weights"][g1].values.copy()
@@ -1027,8 +1027,8 @@ def ParalogSubstitutions(sm, ortholog_pairs, paralog_pairs=None, psub_thr = 0.3)
 
     orths = to_vn(gn[np.vstack((np.array(Xo), np.array(Yo))).T])
     paras = to_vn(gn[np.vstack((np.array(Xp), np.array(Yp))).T])
-    orth_corrs = gnnm[Xo, Yo].A.flatten()
-    par_corrs = gnnm[Xp, Yp].A.flatten()
+    orth_corrs = gnnm[Xo, Yo].toarray().flatten()
+    par_corrs = gnnm[Xp, Yp].toarray().flatten()
     diff_corrs = par_corrs - orth_corrs
 
     RES = pd.DataFrame(
@@ -1487,7 +1487,7 @@ def _compute_csim(samap, key, X=None, prepend=True, n_top = 0):
         xc,yc = substr(list(valdict.keys()),';')
         xc = xc.astype('int')
         yc=ixer[yc].values
-        cell_cluster_scores = sp.sparse.coo_matrix((cell_scores,(xc,yc)),shape=(X.shape[0],clu.size)).A
+        cell_cluster_scores = sp.sparse.coo_matrix((cell_scores,(xc,yc)),shape=(X.shape[0],clu.size)).toarray()
 
         for i, c in enumerate(clu):
             if n_top > 0:
