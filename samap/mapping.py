@@ -1359,7 +1359,7 @@ def _filter_gnnm(gnnm, thr=0.25):
     x, y = gnnm.nonzero()
     mas = gnnm.max(1).toarray().flatten()
     gnnm4 = gnnm.copy()
-    gnnm4.data[gnnm4[x, y].toarray().flatten() < mas[x] * thr] = 0
+    gnnm4.data[np.array(gnnm4[x, y]).flatten() < mas[x] * thr] = 0
     gnnm4.eliminate_zeros()
     x, y = gnnm4.nonzero()
     z = gnnm4.data
