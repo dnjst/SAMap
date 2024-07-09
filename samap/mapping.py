@@ -1216,7 +1216,7 @@ def _coarsen_blast_graph(gnnm, gns, names):
     xn,yn = s[xg].values,s[yg].values # convert gene pairs to indexes
     gnnm = sp.sparse.coo_matrix((da,(xn,yn)),shape=(gn.size,)*2).tocsr() # create sparse matrix
 
-    f = gnnm.sum(1).toarray().flatten() != 0 #eliminate zero rows/columns
+    f = np.array(gnnm.sum(1)).flatten() != 0 #eliminate zero rows/columns
     gn = gn[f]
     sps = np.array([x.split('_')[0] for x in gn])
 
