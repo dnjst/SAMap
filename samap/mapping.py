@@ -440,7 +440,7 @@ class SAMAP(object):
         
 
         nnm = samap.adata.obsp['connectivities']
-        su = nnm.sum(1).A.flatten()[:,None]
+        su = nnm.sum(1).toarray().flatten()[:,None]
         su[su==0]=1
 
         nnm = nnm.multiply(1/su).tocsr()
@@ -448,10 +448,10 @@ class SAMAP(object):
         for sid in gs.keys():
             g = gs[sid]
             try:
-                AS[sid] = self.sams[sid].adata[:,g].X.A.flatten()
+                AS[sid] = self.sams[sid].adata[:,g].X.toarray().flatten()
             except KeyError:
                 try:
-                    AS[sid] = self.sams[sid].adata[:,sid+'_'+g].X.A.flatten()
+                    AS[sid] = self.sams[sid].adata[:,sid+'_'+g].X.toarray().flatten()
                 except KeyError:
                     raise KeyError(f'Gene not found in species {sid}')
             
@@ -556,8 +556,8 @@ class SAMAP(object):
         if qgene2 is None:
             raise ValueError(f"Query gene {gene2} not found in dataset.")
 
-        a = self.gnnm[self.gns==qgene1].A.flatten()[self.gns==qgene2][0]
-        b = self.gnnm_refined[self.gns==qgene1].A.flatten()[self.gns==qgene2][0]
+        a = self.gnnm[self.gns==qgene1].toarray().flatten()[self.gns==qgene2][0]
+        b = self.gnnm_refined[self.gns==qgene1].toarray().flatten()[self.gns==qgene2][0]
         return {"blast":a,"correlation":b}  
 
     def scatter(self,axes=None,COLORS=None,ss=None,**kwargs):  
@@ -740,7 +740,7 @@ def _avg_as(s):
     for i in range(xu.size):
         for j in range(xu.size):
             if i!=j:
-                a[i,j] = s.adata.obsp['connectivities'][x==xu[i],:][:,x==xu[j]].sum(1).A.flatten().mean() / s.adata.uns['mapping_K']
+                a[i,j] = s.adata.obsp['connectivities'][x==xu[i],:][:,x==xu[j]].sum(1).toarray().flatten().mean() / s.adata.uns['mapping_K']
     return pd.DataFrame(data=a,index=xu,columns=xu)
         
 @njit(parallel=True)        
@@ -831,7 +831,7 @@ def _mapper(
 
     B = ovt
     # already sum-normalized per species
-    #s = B.sum(1).A
+    #s = B.sum(1).toarray()
     #s[s == 0] = 1
     #B = B.multiply(1 / s).tocsr()
 
@@ -877,13 +877,13 @@ def _mapper(
         F.data[:] = vals
         
         # normalize by maximum and rescale with tanh
-        ma = F.max(1).A
+        ma = F.max(1).toarray()
         ma[ma==0]=1
         F = F.multiply(1/ma).tocsr()
         F.data[:] = _tanh_scale(F.data,center=0.7,scale=10)
         
         # get max aligment score from before
-        ma = D.max(1).A
+        ma = D.max(1).toarray()
         ma[ma==0]=1
         
         # geometric mean expression correlation scores by alignment scores
@@ -891,7 +891,7 @@ def _mapper(
         D.data[:] = np.sqrt(D.data)
         
         # get new max scores
-        ma2 = D.max(1).A
+        ma2 = D.max(1).toarray()
         ma2[ma2==0]=1
         
         # change new max scores to old max scores
@@ -919,21 +919,21 @@ def _mapper(
         Dk = sp.sparse.vstack(Dk).tocsr()
         denom = (k1 * (len(sams.keys())-1))
             
-    sr = Dk.sum(1).A    
+    sr = Dk.sum(1).toarray()  
     
     x = 1 - sr.flatten() / denom
     
     sr[sr==0]=1
-    st = Dk.sum(0).A.flatten()[None,:]
+    st = Dk.sum(0).toarray().flatten()[None,:]
     st[st==0]=1
     proj = Dk.multiply(1 / sr).dot(Dk.multiply(1 / st)).tocsr()
     z = proj.copy()
     z.data[:] = 1
-    idx = np.where(z.sum(1).A.flatten() >= k1)[0]
+    idx = np.where(z.sum(1).toarray().flatten() >= k1)[0]
     
     omp = nnm_internal0
     omp.data[:]=1
-    s = proj.max(1).A
+    s = proj.max(1).toarray()
     s[s == 0] = 1
     proj = proj.multiply(1 / s).tocsr()    
     X, Y = omp.nonzero()
@@ -941,7 +941,7 @@ def _mapper(
     Y2 = Y[np.in1d(X, idx)]
 
     omp = omp.tolil()
-    omp[X2, Y2] = np.vstack((proj[X2, Y2].A.flatten(), np.ones(X2.size) * 0.3)).max(
+    omp[X2, Y2] = np.vstack((proj[X2, Y2].toarray().flatten(), np.ones(X2.size) * 0.3)).max(
         0
     )
 
@@ -1029,13 +1029,13 @@ def _refine_corr(
     gnnm3 = sp.sparse.lil_matrix(gnnm.shape)
     for i in range(len(I)):
         x, y = GNS[P[i][:, 0]].values.flatten(), GNS[P[i][:, 1]].values.flatten()
-        gnnm3[x, y] = GNNMSUBS[i][I[i][:, 0], I[i][:, 1]].A.flatten()
+        gnnm3[x, y] = GNNMSUBS[i][I[i][:, 0], I[i][:, 1]].toarray().flatten()
 
     gnnm3 = gnnm3.tocsr()
     x, y = gnnm3.nonzero()
     # gnnm3[y,x]=gnnm3.data
     gnnm3 = gnnm3.tolil()
-    gnnm3[y, x] = gnnm3[x, y].A.flatten()
+    gnnm3[y, x] = gnnm3[x, y].toarray().flatten()
     gnnm3 = gnnm3.tocsr()
     return gnnm3
 
@@ -1216,7 +1216,7 @@ def _coarsen_blast_graph(gnnm, gns, names):
     xn,yn = s[xg].values,s[yg].values # convert gene pairs to indexes
     gnnm = sp.sparse.coo_matrix((da,(xn,yn)),shape=(gn.size,)*2).tocsr() # create sparse matrix
 
-    f = gnnm.sum(1).A.flatten() != 0 #eliminate zero rows/columns
+    f = gnnm.sum(1).toarray().flatten() != 0 #eliminate zero rows/columns
     gn = gn[f]
     sps = np.array([x.split('_')[0] for x in gn])
 
@@ -1357,9 +1357,9 @@ def _map_features_un(A, B, sam1, sam2, thr=1e-6):
 
 def _filter_gnnm(gnnm, thr=0.25):
     x, y = gnnm.nonzero()
-    mas = gnnm.max(1).A.flatten()
+    mas = gnnm.max(1).toarray().flatten()
     gnnm4 = gnnm.copy()
-    gnnm4.data[gnnm4[x, y].A.flatten() < mas[x] * thr] = 0
+    gnnm4.data[gnnm4[x, y].toarray().flatten() < mas[x] * thr] = 0
     gnnm4.eliminate_zeros()
     x, y = gnnm4.nonzero()
     z = gnnm4.data
@@ -1371,7 +1371,7 @@ def _filter_gnnm(gnnm, thr=0.25):
 
 def _get_pairs(sams, gnnm, gns_dict, NOPs1=0, NOPs2=0):
     # gnnm = filter_gnnm(gnnm)
-    su = gnnm.max(1).A
+    su = gnnm.max(1).toarray()
     su[su == 0] = 1
     gnnm = gnnm.multiply(1 / su).tocsr()
     Ws = {}
@@ -1530,7 +1530,7 @@ def _refine_corr_parallel(
     nnms = []
     for i,sid in enumerate(sams.keys()):
         nnms.append(nnm[:,st.adata.obs['batch'] == f'batch{i+1}'])
-        s1 = nnms[-1].sum(1).A
+        s1 = nnms[-1].sum(1).toarray()
         s1[s1 < 1e-3] = 1
         s1 = s1.flatten()[:, None]  
         nnms[-1] = nnms[-1].multiply(1 / s1)
@@ -1574,14 +1574,14 @@ def _refine_corr_parallel(
 
     if use_seq:
         gnnm3[pairs[:, 0], pairs[:, 1]] = (
-            CORR * gnnm2[pairs[:, 0], pairs[:, 1]].A.flatten()
+            CORR * gnnm2[pairs[:, 0], pairs[:, 1]].toarray().flatten()
         )
         gnnm3[pairs[:, 1], pairs[:, 0]] = (
-            CORR * gnnm2[pairs[:, 1], pairs[:, 0]].A.flatten()
+            CORR * gnnm2[pairs[:, 1], pairs[:, 0]].toarray().flatten()
         )
     else:
-        gnnm3[pairs[:, 0], pairs[:, 1]] = CORR  # *gnnm2[x,y].A.flatten()
-        gnnm3[pairs[:, 1], pairs[:, 0]] = CORR  # *gnnm2[x,y].A.flatten()
+        gnnm3[pairs[:, 0], pairs[:, 1]] = CORR  # *gnnm2[x,y].toarray().flatten()
+        gnnm3[pairs[:, 1], pairs[:, 0]] = CORR  # *gnnm2[x,y].toarray().flatten()
 
     gnnm3 = gnnm3.tocsr()
     gnnm3.eliminate_zeros()
@@ -1718,7 +1718,7 @@ def _mapping_window(sams, gnnm=None, gns=None, K=20, pairwise=True):
             species_indexer[i] = species_indexer[i]+species_indexer[i-1].max()+1
             genes_indexer[i] = genes_indexer[i]+genes_indexer[i-1].max()+1
 
-        su = gnnm_corr.sum(0).A
+        su = gnnm_corr.sum(0).toarray()
         su[su==0]=1
         gnnm_corr = gnnm_corr.multiply(1/su).tocsr()
         
@@ -1734,7 +1734,7 @@ def _mapping_window(sams, gnnm=None, gns=None, K=20, pairwise=True):
                 for j,sid2 in enumerate(sams.keys()):
                     if i != j:
                         gnnm_corr_sub = gnnm_corr[genes_indexer[i]][:,genes_indexer[j]]
-                        su = gnnm_corr_sub.sum(0).A
+                        su = gnnm_corr_sub.sum(0).toarray()
                         su[su==0]=1
                         gnnm_corr_sub = gnnm_corr_sub.multiply(1/su).tocsr()                        
                         xtr.append(X[species_indexer[i]][:,genes_indexer[i]].dot(gnnm_corr_sub))
@@ -1755,7 +1755,7 @@ def _mapping_window(sams, gnnm=None, gns=None, K=20, pairwise=True):
 
         mus = []        
         for i,sid in enumerate(sams.keys()):
-            mus.append(Xc[species_indexer[i]].mean(0).A.flatten())
+            mus.append(Xc[species_indexer[i]].mean(0).toarray().flatten())
 
         gc.collect()   
         
@@ -1789,7 +1789,7 @@ def _mapping_window(sams, gnnm=None, gns=None, K=20, pairwise=True):
             adatas[sid] = sams[sid].adata
             Ws[sid] = adatas[sid].var["weights"].values
             ss[sid] = std.fit_transform(adatas[sid].X).multiply(Ws[sid][None,:]).tocsr()
-            mus.append(ss[sid].mean(0).A.flatten())
+            mus.append(ss[sid].mean(0).toarray().flatten())
             species_indexer.append(np.arange(ss[sid].shape[0]))        
         for i in range(1,len(species_indexer)):
             species_indexer[i] = species_indexer[i]+species_indexer[i-1].max()+1            
@@ -1817,7 +1817,7 @@ def _mapping_window(sams, gnnm=None, gns=None, K=20, pairwise=True):
                 b = _united_proj(query, reference, k=k)
                 
                 # sum-normalize each species individually.
-                su = b.sum(1).A
+                su = b.sum(1).toarray()
                 su[su==0]=1
                 b = b.multiply(1/su).tocsr()
 
